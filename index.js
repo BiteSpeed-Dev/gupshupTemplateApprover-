@@ -1,0 +1,327 @@
+const puppeteer = require("puppeteer");
+require('dotenv').config();
+const reader = require('xlsx');
+const fs = require('fs');
+
+
+//PARSE EXCEL FILE FOR TEMPLATE DATA IN OBJECT ARRAY
+const file = reader.readFile('./data.xlsx')  
+let templateArray = [], failedCases = [];
+const sheets = file.SheetNames;
+for(let i = 0; i < sheets.length; i++)
+{
+   const temp = reader.utils.sheet_to_json(file.Sheets[file.SheetNames[i]]);
+   temp.forEach((res) => {templateArray.push(res)});
+}
+
+
+//AUTOMATE TEMPLATE CREATION PROCESS
+(async()=>{
+
+    console.log(`
+    /*********************************************************************************/\n 
+     PLEASE USE FAST SPEED INTERNET THIS PROCESS MIGHT MISBEHAVE DUE TO INTERNET SPEED 
+    /*********************************************************************************/\n
+    `)
+
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+
+    const username = process.env.GUPSHUP_USERNAME;
+    const password = process.env.GUPSHUP_PASSWORD;
+    const templatePassword = process.env.GUPSHUP_TEMPLATE_PASSWORD;
+
+    try {
+
+        //STEP 1: setup webpage
+        await page.goto("https://unify.smsgupshup.com/WhatsApp/Analytics/");
+        await page.setViewport({ width: 1280, height: 1800 });
+        await page.waitForSelector('#submit_field', {visible: true});
+
+        console.log("* Gupshup Login page Loaded");
+
+        //STEP 2: Enter credentials
+        await addInput(page, 'input[name="username"]', username);
+        await addInput(page, 'input[name="password"]', password);
+
+        //STEP 3: Click Login wait for login navigation:
+        //There is an alternative way to get this button by iterating over complete element set and looking for "Login"
+        await clickAndWait(page, 'div[class="ui submit blue button"]', '#welcome_note', null)
+
+        console.log("* Successfully Logged In and navigating to template page");
+
+        //click on side bar and wait for 500 milliseconds
+        await clickAndWait(page, 'a[id="sidebar_trigger"]', null, 500);//sliding side bar is not an network call so we can just wait for animation
+
+        //STEP 4: click to template creation page link and wait for it
+        await clickAndWait(page, 
+            'a[href="/WhatsApp/Analytics/views/message_template/create"]', 
+            '#create_template_form', null);
+        
+        console.log("* Template creation page loaded, creating template one by one");
+
+
+        //STEP 5: Iterate over template raw data and fill form
+        await templateFormLoop(page, templatePassword, templateArray);
+
+        //STEP 6: show and save failed cases
+        if(failedCases.length>0){
+            writeTofile('./failed.json', failedCases);   
+        }
+
+        console.log(`\n\n/*******************************************\n
+        DONE with ${failedCases.length} failed cases out of ${templateArray.length}, 
+        checkout failed.json and ./screenshots for more details ***/\n`);
+
+        await browser.close();   
+    
+    } catch (err) {
+        console.log("## ERROR ## : ", err.message, "\n");
+        console.error(err); 
+    }
+})();
+
+
+async function templateFormLoop(page, templatePassword, templateArr){
+
+    //templateArr.length
+    for (let index = 0; index < templateArr.length; index++) {
+        const template = templateArr[index];
+
+        try {
+        
+            //STEP 5.N: FILL TEMPLATES INPUTS
+            //password
+            try {
+                await addInput(page, 'input[name="password"]', templatePassword);
+            } catch (e) {
+                console.log("Template password error: ", e.message);            
+            }
+            //template name
+            await addInput(page, 'input[name="template_name"]', template["Template Name"]);
+            //category
+            await clickAndWait(page, 
+                `input[value=${getTemplateCategory(template['Category'])}]`, null, 10);
+            //type
+            await page.select('#type_dropdown', getMsgType(template['Type']));
+            //language
+            await page.evaluate(() => {
+                document.querySelector('input[class="search"]').click();
+                document.querySelector('div[data-value="en"]').click();// ** THIS WILL ALWAYS SELECT ENGLISH ONLY **
+            });
+            //body/template
+            await addInput(page, 'textarea[name="template_message"]', template['Template']);    
+            
+            
+            //button
+            let buttonType = getButtonType(template['Button Type']);
+            await page.select('#button_dropdown', buttonType);
+
+            if(buttonType == 'QUICK_REPLY'){
+                //add button text
+                await addInput(page, 'input[class="quick_reply_button_text"]', template['Button Text']);    
+            
+            }else if(buttonType == 'CALL_TO_ACTION'){
+                //select action
+                await page.select(
+                    '.call_to_action_type_dropdown', 
+                    getButtonAction(template['Button Type']));
+                //add button text
+                await addInput(page, 
+                    `input[class="${getButtonTextElementId(template['Button Type'])}"]`, 
+                    template['Button Text']);    
+                //select dynamic link
+                await page.select('#url_type_dropdown', 'DYNAMIC');    
+                //add website
+                await addInput(page, 'input[id="website_url"]', 'https://bspd.me/');// ** HARDCODED DYNAMIC WEBSITE **
+            }
+
+            //ADD SAMPLES
+            await addSamples(page);
+
+            //Click create button
+            await clickAndWait(page, 'button[id="create_template_submit"]', null, 1500);
+
+            //Template is successfully created if it contains substring of:
+            /**
+             * Excellent🤘
+             * Your Message Template📩 has been created successfully🙏.
+             * You can now test🧪 this template once it gets approved✔️
+             */
+            let successfullyCreated = await page.evaluate(() => {
+                return (
+                    document.documentElement.innerHTML.includes('has been created successfully')
+                );
+            });
+
+            if(!successfullyCreated){
+                await page.screenshot({ path: `./screenshots/template${index + 1}.png` });
+
+                failedCases.push(template);
+                console.log(`* Template no. ${index + 1} is failed`);
+                await page.reload({ waitUntil: ["load"] });
+            }else{
+                //Click on create next template
+                await clickAndWait(page,  'a[href="/WhatsApp/Analytics/views/message_template/create"]', 
+                    '#create_template_form', null);
+                console.log(`* Template no. ${index + 1} is created successfully`);    
+                await page.screenshot({ path: `./screenshots/template${index + 1}.png` });
+            }
+            //console.log(template);    
+        } catch (loopErr) {
+            failedCases.push(template);
+            console.log("## Mid time ERROR: ", loopErr.message);
+            console.log(`* Template no. ${index + 1} is failed`);
+        }
+    }
+}
+
+async function addSamples(page){
+    
+    await clickAndWait(page, `button[id=add_sample]`, '#add_sample_grid', 1000);
+
+    await page.evaluate(() => {
+        let sampleInputArr = document.querySelectorAll('.template_variable_examples_input');
+        sampleInputArr.forEach(input => {
+            input.value = "test text: ab@12_ a:`+%";
+        });
+    });
+
+    await addInput(page, 'input[name="button_examples"]', 'https://bspd.me/');
+
+    await clickAndWait(page, `button[class=wa-modal_actions__main]`, null, 500);
+}
+
+//FUNCTION TO FOCUS AND ADD TEXT TO INPUT FIELDS
+async function addInput(page, elementSelector, data){
+    await page.focus(elementSelector);
+    await page.keyboard.type(data);
+}
+
+
+//FUNCTION TO CLICK AND WAIT
+async function clickAndWait(page, elementSelector, waitFor, waitTill){
+    await page.click(elementSelector);
+    
+    if(waitFor){
+        await page.waitForSelector(waitFor, {visible: true});
+    }
+
+    if(waitTill){
+        await page.waitForTimeout(waitTill);
+    }
+}
+
+
+function getTemplateCategory(value){
+    let elementTag;
+    switch (value) {
+        case 'Payment Update':
+            elementTag = 'PAYMENT_UPDATE' 
+            break;
+        case 'Appointment Update':
+            elementTag = 'APPOINTMENT_UPDATE' 
+            break;
+        case 'Shipping Update':
+            elementTag = 'SHIPPING_UPDATE' 
+            break;
+        case 'Personal Finance Update':
+            elementTag = 'PERSONAL_FINANCE_UPDATE' 
+            break;
+        case 'Issue Resolution':
+            elementTag = 'ISSUE_RESOLUTION' 
+            break;
+        case 'Alert Update':
+            elementTag = 'ALERT_UPDATE' 
+            break;
+        case 'Transportation Update':
+            elementTag = 'TRANSPORTATION_UPDATE' 
+            break;
+        case 'Reservation Update':
+            elementTag = 'RESERVATION_UPDATE' 
+            break;
+        case 'Auto Reply':
+            elementTag = 'AUTO_REPLY' 
+            break;
+        case 'Ticket Update':
+            elementTag = 'TICKET_UPDATE' 
+            break;
+        case 'Account Update':
+            elementTag = 'ACCOUNT_UPDATE' 
+            break;                                       
+        default:
+            elementTag = 'PAYMENT_UPDATE' 
+            break;
+    }
+
+    return elementTag;
+}
+
+
+function getMsgType(value){
+    let elementTag;
+    switch (value) {
+        case 'TEXT':
+            elementTag = 'TEXT' 
+            break;
+        case 'IMAGE':
+            elementTag = 'MEDIA' 
+            break;                                     
+        default:
+            elementTag = 'TEXT' 
+            break;
+    }
+
+    return elementTag;
+}
+
+function getButtonType(value){
+    let elementTag;
+    switch (value) {
+        case 'Call to Action- Visit Website':
+            elementTag = 'CALL_TO_ACTION' 
+            break;
+        case 'Quick Reply':
+            elementTag = 'QUICK_REPLY' 
+            break;                                     
+        default:
+            elementTag = 'NONE' 
+            break;
+    }
+
+    return elementTag;
+}
+
+function getButtonAction(value){
+    
+    let elementTag;
+    if(value.includes(("Visit Website").toLowerCase())){
+        elementTag = "url";
+    }else if(value.includes(("Call Phone Number").toLowerCase())){
+        elementTag = "phone_number";
+    }else{
+        elementTag = "url";//default case
+    }
+
+    return elementTag;
+}
+
+function getButtonTextElementId(value){
+    
+    let elementTag;
+    if(value == 'Quick Reply'){
+        elementTag = 'quick_reply_button_text';
+    }else if(value.includes(("Call Phone Number").toLowerCase())){
+        elementTag = "phone_number_button_text call_to_action_button_text";
+    }else if(value.includes(("Visit Website").toLowerCase())){
+        elementTag = "url_button_text call_to_action_button_text";
+    }else{
+        elementTag = "url_button_text call_to_action_button_text";//default case
+    }
+
+    return elementTag;
+}
+
+function writeTofile(path, content) {
+    fs.writeFileSync(path, JSON.stringify(content));
+}
