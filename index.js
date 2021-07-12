@@ -24,7 +24,7 @@ for(let i = 0; i < sheets.length; i++)
     /*********************************************************************************/\n
     `)
 
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({ headless: false, slowMo: 30 });
     const page = await browser.newPage();
 
     const username = process.env.GUPSHUP_USERNAME;
@@ -35,7 +35,7 @@ for(let i = 0; i < sheets.length; i++)
 
         //STEP 1: setup webpage
         await page.goto("https://unify.smsgupshup.com/WhatsApp/Analytics/");
-        await page.setViewport({ width: 1280, height: 1800 });
+        await page.setViewport({ width: 1920, height: 1080 });
         await page.waitForSelector('#submit_field', {visible: true});
 
         console.log("* Gupshup Login page Loaded");
@@ -86,24 +86,26 @@ async function templateFormLoop(page, templatePassword, templateArr){
 
     //templateArr.length
     for (let index = 0; index < templateArr.length; index++) {
-        const template = templateArr[index];
-
+        const template = templateArr[index];    
         try {
         
             //STEP 5.N: FILL TEMPLATES INPUTS
             //password
             try {
                 await addInput(page, 'input[name="password"]', templatePassword);
-            } catch (e) {
-                console.log("Template password error: ", e.message);            
-            }
-            //template name
+            } catch (e) {}
+            //template name//template["Template Name"]
             await addInput(page, 'input[name="template_name"]', template["Template Name"]);
             //category
             await clickAndWait(page, 
                 `input[value=${getTemplateCategory(template['Category'])}]`, null, 10);
             //type
-            await page.select('#type_dropdown', getMsgType(template['Type']));
+            let msgType = getMsgType((template['Type']).trim()); 
+            await page.select('#type_dropdown', getMsgType((template['Type']).trim()));
+            if(msgType == 'MEDIA'){
+                await clickAndWait(page, `input[name="media_types"][value="image"]`, null, 10);
+            }
+            
             //language
             await page.evaluate(() => {
                 document.querySelector('input[class="search"]').click();
@@ -137,10 +139,11 @@ async function templateFormLoop(page, templatePassword, templateArr){
             }
 
             //ADD SAMPLES
-            await addSamples(page);
+            await addSamples(page, template);
 
+            console.log(`* Submitting template no. ${index + 1}`);
             //Click create button
-            await clickAndWait(page, 'button[id="create_template_submit"]', null, 1500);
+            await clickAndWait(page, 'button[id="create_template_submit"]', null, 5500);
 
             //Template is successfully created if it contains substring of:
             /**
@@ -149,45 +152,56 @@ async function templateFormLoop(page, templatePassword, templateArr){
              * You can now test🧪 this template once it gets approved✔️
              */
             let successfullyCreated = await page.evaluate(() => {
-                return (
-                    document.documentElement.innerHTML.includes('has been created successfully')
-                );
+                let exist = document.body.innerHTML.search("has been created successfully");
+                return (exist != -1);
             });
 
-            if(!successfullyCreated){
-                await page.screenshot({ path: `./screenshots/template${index + 1}.png` });
+            //take snap of last screen
+            await page.screenshot({ path: `./screenshots/template${index + 1}.png` });
 
+            //handle success and failed cases
+            if(!successfullyCreated){
                 failedCases.push(template);
                 console.log(`* Template no. ${index + 1} is failed`);
-                await page.reload({ waitUntil: ["load"] });
             }else{
-                //Click on create next template
-                await clickAndWait(page,  'a[href="/WhatsApp/Analytics/views/message_template/create"]', 
-                    '#create_template_form', null);
                 console.log(`* Template no. ${index + 1} is created successfully`);    
-                await page.screenshot({ path: `./screenshots/template${index + 1}.png` });
             }
-            //console.log(template);    
+            //reload page for next template (if any)
+            await page.reload({ waitUntil: ["load"] });
         } catch (loopErr) {
             failedCases.push(template);
-            console.log("## Mid time ERROR: ", loopErr.message);
+            console.log("## ERROR INSIDE TEMPLATE LOOP: ", loopErr.message);
             console.log(`* Template no. ${index + 1} is failed`);
         }
     }
 }
 
-async function addSamples(page){
+async function addSamples(page, template){
     
     await clickAndWait(page, `button[id=add_sample]`, '#add_sample_grid', 1000);
 
-    await page.evaluate(() => {
-        let sampleInputArr = document.querySelectorAll('.template_variable_examples_input');
-        sampleInputArr.forEach(input => {
-            input.value = "test text: ab@12_ a:`+%";
-        });
-    });
+    let inputCount = (await page.$$('input[class="template_variable_examples_input"]')).length;
+    for (let i = 0; i < inputCount; i++) {
+        await addInput(page, `input[name="{{${i+1}}}"]`, template[`{{${i+1}}}`]);    
+    }
+    // await page.evaluate(() => {
+    //     let sampleInputArr = document.querySelectorAll('.template_variable_examples_input');
+    //     sampleInputArr.forEach(input => {
+    //         input.value = "test text: ab@12_ a:`+%";
+    //     });
+    // });
 
-    await addInput(page, 'input[name="button_examples"]', 'https://bspd.me/');
+    let buttonExist = await page.$('input[name="button_examples"]');
+    if(buttonExist){
+        await addInput(page, 'input[name="button_examples"]', 'https://bspd.me/');
+    }
+
+    //let uploadExist = await checkIfElementExist(page, 'input[id=add_media_file_handle_button]');
+    let uploadExist = await page.$('input[id=add_media_file_handle_button]');
+    if(uploadExist){
+        const elementHandle = await page.$('input[id=add_media_file_handle_button]');
+        await elementHandle.uploadFile('./defaultImage.jpeg');
+    }
 
     await clickAndWait(page, `button[class=wa-modal_actions__main]`, null, 500);
 }
