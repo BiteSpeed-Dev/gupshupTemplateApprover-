@@ -24,7 +24,7 @@ for(let i = 0; i < sheets.length; i++)
     /*********************************************************************************/\n
     `)
 
-    const browser = await puppeteer.launch({ headless: false, slowMo: 30 });
+    const browser = await puppeteer.launch({ headless: false, slowMo: 10 });
     const page = await browser.newPage();
 
     const username = process.env.GUPSHUP_USERNAME;
@@ -95,7 +95,7 @@ async function templateFormLoop(page, templatePassword, templateArr){
                 await addInput(page, 'input[name="password"]', templatePassword);
             } catch (e) {}
             //template name//template["Template Name"]
-            await addInput(page, 'input[name="template_name"]', template["Template Name"]);
+            await addInput(page, 'input[name="template_name"]', template["Template Name"] + "test_x");
             //category
             await clickAndWait(page, 
                 `input[value=${getTemplateCategory(template['Category'])}]`, null, 10);

@@ -3,3 +3,4 @@ screenshots/*
 !screenshots/SAMPLE_SS.png
 .env
 failed.json
+*.zip
