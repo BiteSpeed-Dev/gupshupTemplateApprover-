@@ -24,12 +24,15 @@ for(let i = 0; i < sheets.length; i++)
     /*********************************************************************************/\n
     `)
 
-    const browser = await puppeteer.launch({ headless: false, slowMo: 10 });
-    const page = await browser.newPage();
-
     const username = process.env.GUPSHUP_USERNAME;
     const password = process.env.GUPSHUP_PASSWORD;
     const templatePassword = process.env.GUPSHUP_TEMPLATE_PASSWORD;
+    const headless = process.env.HEADLESS;
+    const slowMo = process.env.SLOW_MO;
+
+
+    const browser = await puppeteer.launch({ headless: JSON.parse(headless), slowMo: JSON.parse(slowMo) });
+    const page = await browser.newPage();
 
     try {
 

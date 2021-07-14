@@ -24,6 +24,8 @@ npm install
 GUPSHUP_USERNAME="*****"
 GUPSHUP_PASSWORD="*****"
 GUPSHUP_TEMPLATE_PASSWORD="*****"
+HEADLESS=true 
+SLOW_MO=0
 ```
 * Run `node index` to start program
 
