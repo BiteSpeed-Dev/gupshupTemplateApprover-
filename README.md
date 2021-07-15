@@ -19,7 +19,7 @@ npm install
 </br>
 
 ## Usages:
-* create a .env file at root level wit h content as:
+* create a `.env` file at root level with content as:
 ```
 GUPSHUP_USERNAME="*****"
 GUPSHUP_PASSWORD="*****"
