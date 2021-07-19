@@ -90,6 +90,7 @@ async function templateFormLoop(page, templatePassword, templateArr){
     //templateArr.length
     for (let index = 0; index < templateArr.length; index++) {
         const template = templateArr[index];    
+
         try {
         
             //STEP 5.N: FILL TEMPLATES INPUTS
@@ -98,7 +99,7 @@ async function templateFormLoop(page, templatePassword, templateArr){
                 await addInput(page, 'input[name="password"]', templatePassword);
             } catch (e) {}
             //template name//template["Template Name"]
-            await addInput(page, 'input[name="template_name"]', template["Template Name"] + "test_x");
+            await addInput(page, 'input[name="template_name"]', template["Template Name"]);
             //category
             await clickAndWait(page, 
                 `input[value=${getTemplateCategory(template['Category'])}]`, null, 10);
@@ -123,9 +124,7 @@ async function templateFormLoop(page, templatePassword, templateArr){
             await page.select('#button_dropdown', buttonType);
 
             if(buttonType == 'QUICK_REPLY'){
-                //add button text
-                await addInput(page, 'input[class="quick_reply_button_text"]', template['Button Text']);    
-            
+                await addMultipleButton(page, template);
             }else if(buttonType == 'CALL_TO_ACTION'){
                 //select action
                 await page.select(
@@ -134,7 +133,7 @@ async function templateFormLoop(page, templatePassword, templateArr){
                 //add button text
                 await addInput(page, 
                     `input[class="${getButtonTextElementId(template['Button Type'])}"]`, 
-                    template['Button Text']);    
+                    template['Button1']);    
                 //select dynamic link
                 await page.select('#url_type_dropdown', 'DYNAMIC');    
                 //add website
@@ -227,6 +226,33 @@ async function clickAndWait(page, elementSelector, waitFor, waitTill){
     if(waitTill){
         await page.waitForTimeout(waitTill);
     }
+}
+
+//FUNCTION TO ADD MULTIPLE BUTTONS
+async function addMultipleButton(page, template){
+    let endButton = 1, buttonArray = [];
+    while(endButton != -1){
+        let currentButton = template[`Button${endButton}`];
+        if(currentButton){
+            buttonArray.push(currentButton);
+            if(endButton>1){
+                await clickAndWait(page, 'div[id="add_button_trigger"]', null, 500);
+            }
+            endButton++;
+        }else{
+            endButton = -1;
+        }
+    }
+
+    let buttonTypeSelector = getButtonTextElementId(template['Button Type']);
+    await page.evaluate((buttonArray, buttonTypeSelector) => {
+        const inputs = [...document.querySelectorAll(`input[class=${buttonTypeSelector}]`)];
+        let count = 0;
+        inputs.forEach(input => {
+            input.value = buttonArray[count];
+            count++;
+        });
+    }, buttonArray, buttonTypeSelector);
 }
 
 
