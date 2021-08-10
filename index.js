@@ -88,7 +88,7 @@ for(let i = 0; i < sheets.length; i++)
 async function templateFormLoop(page, templatePassword, templateArr){
 
     //templateArr.length
-    for (let index = 0; index < templateArr.length; index++) {
+    for (let index = 1; index < 2; index++) {
         const template = templateArr[index];    
 
         try {
@@ -182,10 +182,14 @@ async function addSamples(page, template){
     
     await clickAndWait(page, `button[id=add_sample]`, '#add_sample_grid', 1000);
 
-    let inputCount = (await page.$$('input[class="template_variable_examples_input"]')).length;
-    for (let i = 0; i < inputCount; i++) {
-        await addInput(page, `input[name="{{${i+1}}}"]`, template[`{{${i+1}}}`]);    
+    
+    //let inputCount = (await page.$$('input[class="template_variable_examples_input"]')).length;
+    for (let i = 0; i < 6; i++) {
+        if(template['Template'].indexOf(`{{${i+1}}}`) != -1){
+            await addInput(page, `input[name="{{${i+1}}}"]`, template[`{{${i+1}}}`]);    
+        }
     }
+
     // await page.evaluate(() => {
     //     let sampleInputArr = document.querySelectorAll('.template_variable_examples_input');
     //     sampleInputArr.forEach(input => {
