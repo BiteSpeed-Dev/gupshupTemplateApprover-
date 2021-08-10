@@ -88,7 +88,7 @@ for(let i = 0; i < sheets.length; i++)
 async function templateFormLoop(page, templatePassword, templateArr){
 
     //templateArr.length
-    for (let index = 0; index < templateArr.length; index++) {
+    for (let index = 13; index < templateArr.length; index++) {
         const template = templateArr[index];    
 
         try {
@@ -116,7 +116,6 @@ async function templateFormLoop(page, templatePassword, templateArr){
                 document.querySelector('div[data-value="en"]').click();// ** THIS WILL ALWAYS SELECT ENGLISH ONLY **
             });
             //body/template
-            console.log(template['Template']);
             await addInput(page, 'textarea[name="template_message"]', template['Template']);    
             
             
@@ -181,6 +180,11 @@ async function templateFormLoop(page, templatePassword, templateArr){
 
 async function addSamples(page, template){
     
+    await page.evaluate(() => {
+        var element = document.querySelector("button[id=add_sample]");
+        element.classList.remove("disabled");
+    });
+
     await clickAndWait(page, `button[id=add_sample]`, '#add_sample_grid', 1000);
 
     
