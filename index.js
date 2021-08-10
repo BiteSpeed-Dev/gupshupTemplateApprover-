@@ -116,6 +116,7 @@ async function templateFormLoop(page, templatePassword, templateArr){
                 document.querySelector('div[data-value="en"]').click();// ** THIS WILL ALWAYS SELECT ENGLISH ONLY **
             });
             //body/template
+            console.log(template['Template']);
             await addInput(page, 'textarea[name="template_message"]', template['Template']);    
             
             
@@ -214,8 +215,9 @@ async function addSamples(page, template){
 
 //FUNCTION TO FOCUS AND ADD TEXT TO INPUT FIELDS
 async function addInput(page, elementSelector, data){
-    await page.focus(elementSelector);
-    await page.keyboard.type(data);
+    //await page.focus(elementSelector);
+    //await page.keyboard.type(data);
+    await page.$eval(elementSelector, (el, data) => el.value = data, data);
 }
 
 
