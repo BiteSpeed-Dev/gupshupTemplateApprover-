@@ -199,7 +199,7 @@ async function addSamples(page, template){
 
     let buttonExist = await page.$('input[name="button_examples"]');
     if(buttonExist){
-        await addInput(page, 'input[name="button_examples"]', 'https://bspd.me/');
+        await addInput(page, 'input[name="button_examples"]', 'https://bspd.me/track');
     }
 
     //let uploadExist = await checkIfElementExist(page, 'input[id=add_media_file_handle_button]');
