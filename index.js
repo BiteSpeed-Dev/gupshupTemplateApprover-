@@ -88,7 +88,7 @@ for(let i = 0; i < sheets.length; i++)
 async function templateFormLoop(page, templatePassword, templateArr){
 
     //templateArr.length
-    for (let index = 1; index < 2; index++) {
+    for (let index = 0; index < templateArr.length; index++) {
         const template = templateArr[index];    
 
         try {
