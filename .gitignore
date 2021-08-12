@@ -4,3 +4,4 @@ screenshots/*
 .env
 failed.json
 *.zip
+data.xlsx
