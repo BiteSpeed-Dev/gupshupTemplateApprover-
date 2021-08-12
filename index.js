@@ -109,12 +109,14 @@ async function templateFormLoop(page, templatePassword, templateArr){
             if(msgType == 'MEDIA'){
                 await clickAndWait(page, `input[name="media_types"][value="image"]`, null, 10);
             }
-            
+
             //language
-            await page.evaluate(() => {
+            let langType = getLanguage(template['Language']);
+            await page.evaluate((langType) => {
                 document.querySelector('input[class="search"]').click();
-                document.querySelector('div[data-value="en"]').click();// ** THIS WILL ALWAYS SELECT ENGLISH ONLY **
-            });
+                document.querySelector(`div[data-value="${langType}"]`).click();// ** THIS WILL ALWAYS SELECT ENGLISH ONLY **
+            }, langType);
+
             //body/template
             await addInput(page, 'textarea[name="template_message"]', template['Template']);    
             
@@ -377,4 +379,31 @@ function getButtonTextElementId(value){
 
 function writeTofile(path, content) {
     fs.writeFileSync(path, JSON.stringify(content));
+}
+
+
+function getLanguage(value){
+    
+    value = value.toLowerCase();
+
+    let elementTag;
+    if(value.includes(("portuguese"))){
+        elementTag = "pt_PT";
+    }else if(value.includes(("german"))){
+        elementTag = "de";
+    }else if(value.includes(("italian"))){
+        elementTag = "it";
+    }else if(value.includes(("dutch"))){
+        elementTag = "nl";
+    }else if(value.includes(("spanish"))){
+        elementTag = "es";
+    }else if(value.includes(("portuguese"))){
+        elementTag = "pt_PT";
+    }else if(value.includes(("hebrew"))){
+        elementTag = "he";
+    }else{
+        elementTag = "en";//default case
+    }
+
+    return elementTag;
 }
